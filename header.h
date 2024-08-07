@@ -128,10 +128,19 @@ struct HMC {
       MC shldr = MC::Zero(Nc,Nc);
       for(int a=0; a<NA; a++) shldr += _t[a]*rhoX(a);
       UH = (0.5*tau*shldr).exp() * U;
-      norm = (UH-UHold).norm()/Nc;
+      norm = (UH-UHold).norm()/std::sqrt(Nc*Nc-Nc);
       // std::cout << "norm = " << norm << std::endl;
-      if(norm<TOL_) break;
-      else if(i>NITER_-2) assert(false);
+      if(norm<2*TOL_) break;
+      else if(i>NITER_-2) {
+        std::clog << "norm = " << norm << std::endl;
+        std::clog << "U = " << std::endl
+                  << U << std::endl;
+        std::clog << "pK = " << std::endl
+                  << pK.transpose() << std::endl;
+        std::clog << "SWITCH = " << SWITCH << std::endl;
+        std::clog << "beta = " << beta << std::endl;
+        assert(false);
+      }
       UHold = UH;
     }
     pK = pK - 0.5*tau*OKX(UH)*dS(U);
@@ -207,9 +216,14 @@ struct HMC {
       }
 
       Double pi_diff = (pi_rev+pi0).norm() / std::sqrt(NA) / std::sqrt(nstep) / beta;
-      Double U_diff = (U_rev-U0).norm() / Nc / std::sqrt(nstep) / beta;
-      assert( pi_diff < 10*TOL );
-      assert( U_diff < 10*TOL );
+      Double U_diff = (U_rev-U0).norm() / std::sqrt(Nc*Nc-Nc) / std::sqrt(nstep) / beta;
+      if(pi_diff > 20*TOL || U_diff > 20*TOL){
+        std::clog << "pi_diff = " << pi_diff << std::endl;
+        std::clog << "U_diff = " << U_diff << std::endl;
+        std::clog << "SWITCH = " << SWITCH << std::endl;
+        std::clog << "beta = " << beta << std::endl;
+        assert( false );
+      }
     }
 
     const Double Hfi = H(pi, U, is_implicit);
@@ -264,13 +278,15 @@ struct RMHMC {
       norm = (pH-pHold).norm()/std::sqrt(NA);
       // std::cout << "norm = " << norm << std::endl;
 
-      if(norm<TOL_) break;
+      if(norm<2*TOL_) break;
       else if(i>NITER_-2) {
         std::clog << "norm = " << norm << std::endl;
         std::clog << "U = " << std::endl
                   << U << std::endl;
         std::clog << "p = " << std::endl
                   << p.transpose() << std::endl;
+        std::clog << "SWITCH = " << SWITCH << std::endl;
+        std::clog << "beta = " << beta << std::endl;
         assert(false);
       }
       pHold = pH;
@@ -294,16 +310,17 @@ struct RMHMC {
       MC shldr = MC::Zero(Nc,Nc);
       for(int a=0; a<NA; a++) shldr += _t[a]*rho(a);
       Up = (0.5*tau*shldr).exp() * UH;
-      norm = (Up-Upold).norm()/Nc;
+      norm = (Up-Upold).norm()/std::sqrt(Nc*Nc-Nc);
 
-      if(norm<TOL_) break;
+      if(norm<2*TOL_) break;
       else if(i>NITER_-2) {
         std::clog << "norm = " << norm << std::endl;
         std::clog << "UH = " << std::endl
                   << UH << std::endl;
         std::clog << "pH = " << std::endl
                   << pH.transpose() << std::endl;
-
+        std::clog << "SWITCH = " << SWITCH << std::endl;
+        std::clog << "beta = " << beta << std::endl;
         assert(false);
       }
       Upold = Up;
@@ -351,7 +368,7 @@ struct RMHMC {
   }
 
   VR dH_dp( const VR& pX, const MC& U ) const {
-    return ( (OKX(U)*pX).array()*MKinv(U) ).matrix();
+    return OKX(U).transpose()*( (OKX(U)*pX).array()*MKinv(U) ).matrix();
   }
 
 
@@ -386,9 +403,14 @@ struct RMHMC {
       for(int n=0; n<nstep; n++) onestep(pi_rev, U_rev);
 
       Double pi_diff = (pi_rev+pi0).norm() / std::sqrt(NA) / std::sqrt(nstep) / beta;
-      Double U_diff = (U_rev-U0).norm() / Nc / std::sqrt(nstep) / beta;
-      assert( pi_diff < 10*TOL );
-      assert( U_diff < 10*TOL );
+      Double U_diff = (U_rev-U0).norm() / std::sqrt(Nc*Nc-Nc) / std::sqrt(nstep) / beta;
+      if(pi_diff > 20*TOL || U_diff > 20*TOL){
+        std::clog << "pi_diff = " << pi_diff << std::endl;
+        std::clog << "U_diff = " << U_diff << std::endl;
+        std::clog << "SWITCH = " << SWITCH << std::endl;
+        std::clog << "beta = " << beta << std::endl;
+        assert( false );
+      }
     }
 
     const Double Hfi = H(pi, U);

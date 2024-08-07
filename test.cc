@@ -23,11 +23,11 @@ const int Nc=2;
 const int NA=Nc*Nc-1;
 double beta=1.0;
 
-const int seed = 45;
+const int seed = 100;
 const double stot = 1.0;
 const int nstep = 4;
 
-const int ntraj = 1e7; // 1e6
+const int ntraj = 1e7; // 1e7
 const int nthermalize = 1e4;
 const int interval = 10;
 
@@ -205,7 +205,7 @@ int main(int argc, char *argv[]){
 
     if(SWITCH==0) hmc(U, is_accept, dH, true); // regular
     else if(SWITCH==1 || SWITCH==2 || SWITCH==10) hmc_pseudo(U, is_accept, dH, true, true); // pseudo
-    else if(SWITCH==3 || SWITCH==4) hmc_rm(U, is_accept, dH, true); // non-exact
+    else if(SWITCH==3 || SWITCH==4 || SWITCH==11) hmc_rm(U, is_accept, dH, true); // non-exact
 
     hmc(U, is_accept, dH);
   }
@@ -224,12 +224,18 @@ int main(int argc, char *argv[]){
     if( (n+1)%interval==0 ){
       const Double tr = U.trace().real();
 
-      ofs << std::setprecision(Logprec)
-          << std::setw(8) << n << " "
-          << std::setw(20) << tr << " "
-          << std::setw(8) << is_accept << " "
-          << std::setw(20) << dH << " "
-          << std::endl;
+      // std::clog << std::setprecision(Logprec)
+      //           << std::setw(8) << n << " "
+      //           << std::setw(20) << tr << " "
+      //           << std::setw(8) << is_accept << " "
+      //           << std::setw(20) << dH << " "
+      //           << std::endl;
+      // ofs << std::setprecision(Logprec)
+      //     << std::setw(8) << n << " "
+      //     << std::setw(20) << tr << " "
+      //     << std::setw(8) << is_accept << " "
+      //     << std::setw(20) << dH << " "
+      //     << std::endl;
 
       obs1.meas( tr );
       obs2.meas( tr*tr );
@@ -253,6 +259,7 @@ int main(int argc, char *argv[]){
             << std::setw(10) << "beta" << " "
             << std::setw(10) << "ntraj" << " "
             << std::setw(10) << "interval" << " "
+            << std::setw(10) << "nstep" << " "
             << std::setw(5) << "switch" << " "
             << std::endl;
 
@@ -264,6 +271,7 @@ int main(int argc, char *argv[]){
             << std::setw(10) << beta << " "
             << std::setw(10) << ntraj << " "
             << std::setw(10) << interval << " "
+            << std::setw(10) << nstep << " "
             << std::setw(5) << SWITCH << " "
             << std::endl;
 
@@ -275,8 +283,59 @@ int main(int argc, char *argv[]){
             << std::setw(10) << beta << " "
             << std::setw(10) << ntraj << " "
             << std::setw(10) << interval << " "
+            << std::setw(10) << nstep << " "
             << std::setw(5) << SWITCH << " "
             << std::endl;
+
+
+
+
+  // const int aa=1;
+  // Double eps = 1.0e-6;
+  // MC Up = (MC::Identity(Nc,Nc)+eps*_t[aa])*U;
+  // MC Um = (MC::Identity(Nc,Nc)-eps*_t[aa])*U;
+  // std::cout << "mkinv(U) numeric deriv: " << std::endl
+  //           << ( MKinv(Up)-MKinv(Um) )/(2.0*eps) << std::endl;
+  // std::cout << "constructed  : " << std::endl
+  //           << dMKinv(U)[aa] << std::endl;
+  // // std::cout << "check: " << std::endl
+  // //           << OKX(U) << std::endl;
+  // std::cout << "OKX(U) numeric deriv: " << std::endl
+  //           << ( OKX(Up)-OKX(Um) )/(2.0*eps) << std::endl;
+  // auto dokx = dOKX(U);
+  // std::cout << "constructed  : " << std::endl
+  //           << dokx[aa] << std::endl;
+
+  // VR pi = hmc_rm.gen_pi(U);
+  // std::cout << "H2 numeric deriv: " << std::endl
+  //           << ( hmc_rm.H(pi,Up)-hmc_rm.H(pi,Um) )/(2.0*eps) << std::endl;
+  // std::cout << "constructed  : " << std::endl
+  //           << hmc_rm.dH_dU(pi,U)[aa] << std::endl;
+
+  // VR pp = pi;
+  // VR pm = pi;
+  // pp[aa] += eps;
+  // pm[aa] -= eps;
+  // std::cout << "H2 numeric deriv: " << std::endl
+  //           << ( hmc_rm.H(pp,U)-hmc_rm.H(pm,U) )/(2.0*eps) << std::endl;
+  // std::cout << "constructed  : " << std::endl
+  //           << hmc_rm.dH_dp(pi,U)[aa] << std::endl;
+
+  // {
+  //   const VR pKp = OKX(U)*pp;
+  //   Double kp = 0.5 * pKp.dot( ( pKp.array()*MKinv_c ).matrix() );
+  //   const VR pKm = OKX(U)*pm;
+  //   Double km = 0.5 * pKm.dot( ( pKm.array()*MKinv_c ).matrix() );
+
+  //   std::cout << "H2 numeric deriv: " << std::endl
+  //             << ( kp-km )/(2.0*eps) << std::endl;
+  //   std::cout << "constructed  : " << std::endl
+  //             << (OKX(U).transpose()*( (OKX(U)*pi).array()*MKinv_c ).matrix())[aa] << std::endl;
+  // }
+
+
+
+
 
   return 0;
 }
@@ -331,17 +390,17 @@ int main(int argc, char *argv[]){
   // std::cout << "constructed  : " << std::endl
   //           << dokx[aa] << std::endl;
 
-  // VR pi = hmc2.gen_pi(U);
+  // VR pi = hmc_rm.gen_pi(U);
   // std::cout << "H2 numeric deriv: " << std::endl
-  //           << ( hmc2.H(pi,Up)-hmc2.H(pi,Um) )/(2.0*eps) << std::endl;
+  //           << ( hmc_rm.H(pi,Up)-hmc_rm.H(pi,Um) )/(2.0*eps) << std::endl;
   // std::cout << "constructed  : " << std::endl
-  //           << hmc2.dH_dU(pi,U)[aa] << std::endl;
+  //           << hmc_rm.dH_dU(pi,U)[aa] << std::endl;
 
   // VR pp = pi;
   // VR pm = pi;
   // pp[aa] += eps;
   // pm[aa] -= eps;
   // std::cout << "H2 numeric deriv: " << std::endl
-  //           << ( hmc2.H(pp,U)-hmc2.H(pm,U) )/(2.0*eps) << std::endl;
+  //           << ( hmc_rm.H(pp,U)-hmc_rm.H(pm,U) )/(2.0*eps) << std::endl;
   // std::cout << "constructed  : " << std::endl
-  //           << hmc2.dH_dp(pi,U)[aa] << std::endl;
+  //           << hmc_rm.dH_dp(pi,U)[aa] << std::endl;

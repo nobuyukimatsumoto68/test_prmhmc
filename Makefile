@@ -1,8 +1,8 @@
 CXX      = g++
-CXXFLAGS = -O3 -std=c++17 -fopenmp -g -Wall -march=native
+CXXFLAGS = -O3 -std=c++17 -fopenmp -g -march=native # -Wall
 INCLUDES = -I/usr/local/include -I/opt/eigen/ -I/opt/eigen/Eigen/
 
-PROG = tes.out
+PROG = tes2.out
 SRCS = test.cc
 
 # OBJS = $(SRCS:%.cpp=%.o)
