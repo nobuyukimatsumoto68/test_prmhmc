@@ -1,5 +1,5 @@
 CXX      = g++
-CXXFLAGS = -O3 -std=c++17 -fopenmp -g -Wall
+CXXFLAGS = -O3 -std=c++17 -fopenmp -g -Wall -march=native
 INCLUDES = -I/usr/local/include -I/opt/eigen/ -I/opt/eigen/Eigen/
 
 PROG = tes.out

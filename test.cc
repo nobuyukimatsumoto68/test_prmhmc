@@ -10,13 +10,14 @@
 // #include <eigen-3.4.0/unsupported/Eigen/MatrixFunctions>
 #include <unsupported/Eigen/MatrixFunctions>
 
-int SWITCH = 3;
+int SWITCH = 11;
 // 0: HMC
 // 1: PRMHMC, differentiable rotation
 // 2: PRMHMC, non-differentiable rotation
-// 3: non-exact RMHMC, constant M
-// 4: non-exact RMHMC, U-dependent M
+// 3: RMHMC, constant M
+// 4: RMHMC, U-dependent M
 // 10: PRMHMC, dS
+// 11: RMHMC, dS
 
 const int Nc=2;
 const int NA=Nc*Nc-1;
@@ -27,7 +28,7 @@ const double stot = 1.0;
 const int nstep = 4;
 
 const int ntraj = 1e7; // 1e6
-const int nthermalize = 1e3;
+const int nthermalize = 1e4;
 const int interval = 10;
 
 
@@ -58,14 +59,10 @@ int main(int argc, char *argv[]){
   MC U = MC::Identity(Nc,Nc);
 
   AR MKinv_c = AR::Zero(NA);
-  MKinv_c(0) = 1.0;
-  MKinv_c(1) = 0.0;
-  MKinv_c(2) = 0.0;
+  MKinv_c << 1.0, 0.0, 0.0;
 
-  AR base(NA);
-  base << 1.0, 1.2, 0.8;
-  std::function<AR(const MC&)> MKinv = [base](const MC& U) {
-    AR res = base;
+  std::function<AR(const MC&)> MKinv = [MKinv_c](const MC& U) {
+    AR res = MKinv_c;
 
     if(SWITCH==4){
       res *= U.trace().real()/Nc;
@@ -74,18 +71,35 @@ int main(int argc, char *argv[]){
     return res;
   };
 
-  std::function<std::vector<AR>(const MC&)> dMKinv = [base](const MC& U) {
+
+  std::function<std::vector<AR>(const MC&)> dMKinv = [MKinv_c](const MC& U) {
     std::vector<AR> res(NA, AR::Zero(NA));
 
     if(SWITCH==4){
-      AR tmp = base;
+      AR tmp = MKinv_c;
       for(int a=0; a<NA; a++) res[a] = (_t[a]*U).trace().real()/Nc * tmp;
     }
     return res;
   };
 
-  std::function<MR(const MC&)> OKX = [](const MC& U) {
 
+  std::function<MR(const MC&)> OKX_const = [](const MC& U) {
+
+    // -- rotation --
+    Double alpha = 3.0;
+
+    MR res(NA, NA);
+    assert(Nc==2);
+    res <<
+      std::cos(alpha), -std::sin(alpha), 0.0,
+      std::sin(alpha), std::cos(alpha), 0.0,
+      0.0, 0.0, 1.0;
+
+    return res;
+  };
+
+
+  std::function<MR(const MC&)> OKX = [](const MC& U) {
     // -- rotation --
     Double alpha = 0.0;
     if(SWITCH==1 || SWITCH==3 || SWITCH==4) alpha = U.trace().real()/Nc;
@@ -100,13 +114,28 @@ int main(int argc, char *argv[]){
         0.0, 0.0, 1.0;
     }
 
-    if(SWITCH==10){
+    if(SWITCH==10 || SWITCH==11){
       VR ds = dS(U);
       ds /= ds.norm();
+
+      VR vec1(NA), vec2(NA);
+      vec1 << 1.0, 0.0, 0.0;
+      vec2 << 0.0, 1.0, 0.0;
+
+      Double n1 = vec1.dot(ds);
+      vec1 -= n1*ds;
+      vec1 /= vec1.norm();
+
+      Double n2 = vec2.dot(ds);
+      vec2 -= n2*ds;
+      Double n2p = vec2.dot(vec1);
+      vec2 -= n2p*vec1;
+      vec2 /= vec2.norm();
+
       res <<
         ds(0), ds(1), ds(2),
-        0.0, 0.0, 0.0,
-        0.0, 0.0, 0.0;
+        vec1(0), vec1(1), vec1(2),
+        vec2(0), vec2(1), vec2(2);
     }
 
     return res;
@@ -137,7 +166,7 @@ int main(int argc, char *argv[]){
       if(SWITCH==2) res[a] = dx * dacos * tmp;
     }
 
-    if(SWITCH==10){
+    if(SWITCH==10 || SWITCH==11){
       std::vector<VR> dds = d_dS(U);
       const VR ds = dS(U);
       Double norm_ds = ds.norm();
@@ -156,8 +185,9 @@ int main(int argc, char *argv[]){
 
 
 
-  HMC hmc(stot, nstep, MKinv_c, OKX);
-  Nonexact_HMC hmc2(stot, nstep, MKinv, dMKinv, OKX, dOKX);
+  HMC hmc(stot, nstep, MKinv_c, OKX_const);
+  HMC hmc_pseudo(stot, nstep, MKinv_c, OKX);
+  RMHMC hmc_rm(stot, nstep, MKinv, dMKinv, OKX, dOKX);
 
   bool is_accept;
   Double dH;
@@ -168,16 +198,26 @@ int main(int argc, char *argv[]){
   std::string filename=std::to_string(beta)+"_"+std::to_string(SWITCH)+".log";
   std::ofstream ofs(filename, std::ofstream::trunc);
 
-  for(int n=0; n<nthermalize; n++) hmc(U, is_accept, dH);
+  for(int n=0; n<nthermalize; n++){
+    project_SUNc(U);
+
+    hmc(U, is_accept, dH);
+
+    if(SWITCH==0) hmc(U, is_accept, dH, true); // regular
+    else if(SWITCH==1 || SWITCH==2 || SWITCH==10) hmc_pseudo(U, is_accept, dH, true, true); // pseudo
+    else if(SWITCH==3 || SWITCH==4) hmc_rm(U, is_accept, dH, true); // non-exact
+
+    hmc(U, is_accept, dH);
+  }
 
   for(int n=0; n<ntraj; n++){
     project_SUNc(U);
 
     hmc(U, is_accept, dH);
 
-    if(SWITCH==0) hmc(U, is_accept, dH, true); // regular
-    else if(SWITCH==1 || SWITCH==2 || SWITCH==10) hmc(U, is_accept, dH, true, true); // pseudo
-    else if(SWITCH==3 || SWITCH==4) hmc2(U, is_accept, dH, true); // non-exact
+    if(SWITCH==0) hmc(U, is_accept, dH, true, true); // regular
+    else if(SWITCH==1 || SWITCH==2 || SWITCH==10) hmc_pseudo(U, is_accept, dH, true, true); // pseudo
+    else if(SWITCH==3 || SWITCH==4 || SWITCH==11) hmc_rm(U, is_accept, dH, true); // non-exact
 
     hmc(U, is_accept, dH);
 
@@ -245,14 +285,14 @@ int main(int argc, char *argv[]){
 
 
 
+  // std::cout << "double: "
+  //           << std::numeric_limits<double>::digits10
+  //           << std::endl
+  //           << "long double: "
+  //           << std::numeric_limits<Double>::digits10
+  //           << std::endl;
 
 
-// std::cout << "double: "
-//           << std::numeric_limits<double>::digits10
-//           << std::endl
-//           << "long double: "
-//           << std::numeric_limits<Double>::digits10
-//           << std::endl;
 
 
 // // -- trivial --

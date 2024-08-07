@@ -226,7 +226,7 @@ struct HMC {
 
 
 
-struct Nonexact_HMC {
+struct RMHMC {
   const Double stot;
   const int nstep;
   const Double tau;
@@ -235,7 +235,7 @@ struct Nonexact_HMC {
   const std::function<MR(const MC&)> OKX;
   const std::function<std::vector<MR>(const MC&)> dOKX;
 
-  Nonexact_HMC(const Double stot_,
+  RMHMC(const Double stot_,
                const Double nstep_,
                const std::function<AR(const MC&)> MKinv_,
                const std::function<std::vector<AR>(const MC&)> dMKinv_,
@@ -387,8 +387,8 @@ struct Nonexact_HMC {
 
       Double pi_diff = (pi_rev+pi0).norm() / std::sqrt(NA) / std::sqrt(nstep) / beta;
       Double U_diff = (U_rev-U0).norm() / Nc / std::sqrt(nstep) / beta;
-      assert( pi_diff < 20*TOL );
-      assert( U_diff < 20*TOL );
+      assert( pi_diff < 10*TOL );
+      assert( U_diff < 10*TOL );
     }
 
     const Double Hfi = H(pi, U);
